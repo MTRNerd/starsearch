@@ -3,15 +3,13 @@ const fetch = require('node-fetch');
 const path = require('path');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Serve static files from public folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Proxy endpoint
 app.get('/proxy', async (req, res) => {
     const url = req.query.url;
-    if (!url) return res.status(400).send('No URL provided');
-
+    if (!url) return res.status(400).send('No URL');
     try {
         const response = await fetch(url, {
             headers: {
@@ -21,34 +19,24 @@ app.get('/proxy', async (req, res) => {
             },
             redirect: 'follow'
         });
-
         const contentType = response.headers.get('content-type') || 'text/html';
         let body = await response.text();
-
         const baseUrl = new URL(url);
         body = body
-            .replace(/(href|src)="(https?:\/\/[^"]+)"/g, (_, attr, link) =>
-                `${attr}="/proxy?url=${encodeURIComponent(link)}"`)
-            .replace(/(href|src)="(\/[^"]+)"/g, (_, attr, link) =>
-                `${attr}="/proxy?url=${encodeURIComponent(baseUrl.origin + link)}"`)
+            .replace(/(href|src)="(https?:\/\/[^"]+)"/g, (_,a,l) => `${a}="/proxy?url=${encodeURIComponent(l)}"`)
+            .replace(/(href|src)="(\/[^"]+)"/g, (_,a,l) => `${a}="/proxy?url=${encodeURIComponent(baseUrl.origin+l)}"`)
             .replace('<head>', `<head><base href="${url}">`);
-
-        res.set({
-            'Content-Type': contentType,
-            'Access-Control-Allow-Origin': '*',
-        });
+        res.set({ 'Content-Type': contentType, 'Access-Control-Allow-Origin': '*' });
         res.removeHeader('X-Frame-Options');
         res.removeHeader('Content-Security-Policy');
-
         res.send(body);
-    } catch (err) {
-        res.status(500).send(`<div style="font-family:sans-serif;padding:40px;text-align:center;background:#111;color:#888;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;"><h2 style="color:#fff">Could not load page</h2><p>${err.message}</p><a href="${req.query.url}" target="_blank" style="color:#8ab4f8">Open directly ↗</a></div>`);
+    } catch(err) {
+        res.status(500).send(`<div style="font-family:monospace;padding:40px;text-align:center;background:#0a0a0a;color:#555;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;"><h2 style="color:#fff">Could not load</h2><p>${err.message}</p><a href="${url}" target="_blank" style="color:rgba(100,180,255,0.8)">Open directly ↗</a></div>`);
     }
 });
 
-// Fallback: serve index.html for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-module.exports = app;
+app.listen(PORT, () => console.log(`StarSearch running on port ${PORT}`));
