@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>New Tab</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@300;400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; color: #fff; font-family: 'Share Tech Mono', monospace; height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+canvas#stars { position: fixed; inset: 0; z-index: 0; }
+
+.ui { position: relative; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 36px; }
+
+/* ANALOG CLOCK */
+.analog-wrap { position: relative; }
+canvas#clock { border-radius: 50%; }
+.analog-glow {
+    position: absolute; inset: -12px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(100,180,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+/* DIGITAL CLOCK */
+.digital {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(28px, 5vw, 56px);
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(100,180,255,0.6), 0 0 60px rgba(100,180,255,0.2);
+}
+.digital .sep {
+    animation: blink 1s step-end infinite;
+    opacity: 1;
+    color: rgba(100,180,255,0.8);
+}
+@keyframes blink { 50% { opacity: 0.2; } }
+
+.date-str {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+}
+
+/* QUICK LINKS */
+.links {
+    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-top: 8px;
+}
+.link-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.6);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+.link-btn:hover {
+    background: rgba(100,180,255,0.1);
+    border-color: rgba(100,180,255,0.4);
+    color: #fff;
+    text-shadow: 0 0 10px rgba(100,180,255,0.5);
+}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<div class="ui">
+    <div class="analog-wrap">
+        <canvas id="clock" width="200" height="200"></canvas>
+        <div class="analog-glow"></div>
+    </div>
+    <div>
+        <div class="digital" id="dig"></div>
+        <div class="date-str" id="datestr" style="text-align:center;margin-top:8px;"></div>
+    </div>
+    <div class="links">
+        <a class="link-btn" href="/" onclick="window.parent.postMessage('close-newtab','*');return false;">← Back to StarSearch</a>
+    </div>
+</div>
+
+<script>
+// STARFIELD
+const sc = document.getElementById('stars'), sx = sc.getContext('2d');
+let W, H, stars = [];
+function rsz() { W = sc.width = innerWidth; H = sc.height = innerHeight; }
+window.onresize = rsz; rsz();
+class Star {
+    constructor() { this.reset(); }
+    reset() { this.x=Math.random()*W; this.y=Math.random()*H; this.z=W; this.hue=Math.random()*360; }
+    update() { this.z-=3; if(this.z<=0) this.reset(); }
+    draw() {
+        const f=W/this.z, px=(this.x-W/2)*f+W/2, py=(this.y-H/2)*f+H/2;
+        sx.fillStyle=`hsla(${this.hue},90%,75%,${Math.min(1,f*2)})`;
+        sx.beginPath(); sx.arc(px,py,f*8,0,7); sx.fill();
+    }
+}
+for(let i=0;i<80;i++) stars.push(new Star());
+function starLoop() {
+    sx.fillStyle='rgba(0,0,0,0.15)'; sx.fillRect(0,0,W,H);
+    stars.forEach(s=>{s.update();s.draw();});
+    requestAnimationFrame(starLoop);
+}
+starLoop();
+
+// ANALOG CLOCK
+const cc = document.getElementById('clock'), cx = cc.getContext('2d');
+const S = 200, R = S/2 - 4;
+
+function drawClock() {
+    const now = new Date();
+    const hr = now.getHours() % 12, mn = now.getMinutes(), sc2 = now.getSeconds();
+
+    cx.clearRect(0,0,S,S);
+
+    // Face
+    cx.save();
+    cx.translate(S/2, S/2);
+
+    // Outer ring
+    cx.beginPath(); cx.arc(0,0,R,0,Math.PI*2);
+    cx.strokeStyle = 'rgba(100,180,255,0.3)'; cx.lineWidth = 1.5; cx.stroke();
+
+    // Inner subtle glow ring
+    cx.beginPath(); cx.arc(0,0,R-6,0,Math.PI*2);
+    cx.strokeStyle = 'rgba(255,255,255,0.05)'; cx.lineWidth = 1; cx.stroke();
+
+    // Hour ticks
+    for(let i=0;i<12;i++) {
+        const a = (i/12)*Math.PI*2;
+        const inner = i%3===0 ? R-14 : R-9;
+        cx.beginPath();
+        cx.moveTo(Math.cos(a)*inner, Math.sin(a)*inner);
+        cx.lineTo(Math.cos(a)*(R-3), Math.sin(a)*(R-3));
+        cx.strokeStyle = i%3===0 ? 'rgba(100,180,255,0.8)' : 'rgba(255,255,255,0.25)';
+        cx.lineWidth = i%3===0 ? 2 : 1;
+        cx.stroke();
+    }
+
+    // Center dot
+    cx.beginPath(); cx.arc(0,0,3,0,Math.PI*2);
+    cx.fillStyle = 'rgba(100,180,255,0.9)'; cx.fill();
+
+    // Hour hand
+    const hAngle = ((hr + mn/60)/12)*Math.PI*2 - Math.PI/2;
+    cx.beginPath();
+    cx.moveTo(Math.cos(hAngle+Math.PI)*10, Math.sin(hAngle+Math.PI)*10);
+    cx.lineTo(Math.cos(hAngle)*(R*0.55), Math.sin(hAngle)*(R*0.55));
+    cx.strokeStyle = '#fff'; cx.lineWidth = 3; cx.lineCap = 'round'; cx.stroke();
+
+    // Minute hand
+    const mAngle = ((mn + sc2/60)/60)*Math.PI*2 - Math.PI/2;
+    cx.beginPath();
+    cx.moveTo(Math.cos(mAngle+Math.PI)*12, Math.sin(mAngle+Math.PI)*12);
+    cx.lineTo(Math.cos(mAngle)*(R*0.78), Math.sin(mAngle)*(R*0.78));
+    cx.strokeStyle = 'rgba(200,230,255,0.9)'; cx.lineWidth = 2; cx.lineCap = 'round'; cx.stroke();
+
+    // Second hand
+    const sAngle = (sc2/60)*Math.PI*2 - Math.PI/2;
+    cx.beginPath();
+    cx.moveTo(Math.cos(sAngle+Math.PI)*16, Math.sin(sAngle+Math.PI)*16);
+    cx.lineTo(Math.cos(sAngle)*(R*0.88), Math.sin(sAngle)*(R*0.88));
+    cx.strokeStyle = 'rgba(100,180,255,0.95)'; cx.lineWidth = 1; cx.lineCap = 'round'; cx.stroke();
+
+    cx.restore();
+}
+
+// DIGITAL CLOCK
+const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function updateDigital() {
+    const now = new Date();
+    let h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    const pad = n => String(n).padStart(2,'0');
+    document.getElementById('dig').innerHTML =
+        `${pad(h)}<span class="sep">:</span>${pad(m)}<span class="sep">:</span>${pad(s)} <span style="font-size:0.5em;opacity:0.6">${ampm}</span>`;
+    document.getElementById('datestr').textContent =
+        `${days[now.getDay()]}  ·  ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+}
+
+function tick() { drawClock(); updateDigital(); }
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
