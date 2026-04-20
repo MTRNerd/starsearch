@@ -1,7 +1,6 @@
 {
-  "name": "starsearch-proxy",
-  "version": "1.0.0",
-  "description": "StarSearch proxy server",
+  "name": "starsearch",
+  "version": "1.0.1",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
